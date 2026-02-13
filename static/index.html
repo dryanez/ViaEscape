@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chile Preparado - Emergency Check</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>Chile Preparado</h1>
+            <p>Verifica tu seguridad ante Tsunami y Volcanes</p>
+        </header>
+
+        <main>
+            <div id="initial-view">
+                <p>Necesitamos tu ubicación para verificar si te encuentras en una zona de peligro.</p>
+                <button id="check-btn" class="btn primary">Verificar Mi Ubicación</button>
+            </div>
+
+            <div id="loading-view" class="hidden">
+                <div class="spinner"></div>
+                <p id="loading-text">Obteniendo ubicación...</p>
+            </div>
+
+            <div id="result-view" class="hidden">
+                <div id="status-icon"></div>
+                <h2 id="status-title"></h2>
+                <p id="status-message"></p>
+
+                <div id="map"></div>
+
+                <div id="route-info" class="hidden card">
+                    <h3>Ruta de Evacuación Más Cercana</h3>
+                    <p><strong>Distancia:</strong> <span id="route-dist"></span> metros</p>
+                    <p><strong>Ubicación:</strong> <span id="route-name"></span></p>
+                    <p class="small">Sigue las señales de evacuación.</p>
+                </div>
+
+                <button id="retry-btn" class="btn secondary">Verificar de nuevo</button>
+            </div>
+        </main>
+
+        <footer>
+            <p>Datos oficiales de ONEMI/SENAPRED</p>
+        </footer>
+    </div>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="/static/script.js"></script>
+</body>
+
+</html>
