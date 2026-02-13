@@ -1,6 +1,5 @@
 fastapi
 uvicorn
 shapely
-fiona
 requests
 python-multipart

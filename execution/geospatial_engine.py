@@ -1,5 +1,5 @@
+import json
 import os
-import fiona
 from shapely.geometry import shape, Point, mapping
 from shapely.ops import nearest_points
 
@@ -11,40 +11,31 @@ class GeospatialEngine:
 
     def _load_data(self):
         """
-        Loads shapefiles using fiona (lightweight) instead of geopandas.
+        Loads GeoJSON using standard json library (lightweight).
         """
-        data_path = ".tmp/data"
-        user_data_path = "Vías_de_Evacuación_Tsunami/vias_evacuacion.shp"
+        geojson_path = os.path.join(os.path.dirname(__file__), "vias_evacuacion.geojson")
         
-        # Load Evacuation Routes (User Provided)
-        if os.path.exists(user_data_path):
+        # Load Evacuation Routes
+        if os.path.exists(geojson_path):
             try:
-                with fiona.open(user_data_path) as source:
-                    # Check CRS (heuristic, fiona returns proj4 string or dict)
-                    # We assume it's roughly correct or we might need handling if it't not EPSG:4326
-                    # For this MVP we trust source or simple user files.
-                    print(f"Loading routes from {user_data_path}...")
-                    for feature in source:
-                        geom = shape(feature['geometry'])
-                        self.evac_routes.append({
-                            'geometry': geom,
-                            'properties': feature['properties']
-                        })
+                with open(geojson_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    
+                print(f"Loading routes from {geojson_path}...")
+                for feature in data['features']:
+                    geom = shape(feature['geometry'])
+                    self.evac_routes.append({
+                        'geometry': geom,
+                        'properties': feature['properties']
+                    })
                 print(f"Loaded {len(self.evac_routes)} evacuation routes.")
             except Exception as e:
                 print(f"Error loading routes: {e}")
         else:
-             print(f"WARNING: Evacuation routes not found at {user_data_path}. Using empty mock.")
+             print(f"WARNING: Evacuation routes not found at {geojson_path}. Using empty mock.")
 
-        # Placeholder for Tsunami Zones (Pending)
-        tsunami_path = os.path.join(data_path, "tsunami", "evacuation_area.shp")
-        if os.path.exists(tsunami_path):
-            try:
-                 with fiona.open(tsunami_path) as source:
-                    for feature in source:
-                        self.tsunami_zones.append(shape(feature['geometry']))
-            except Exception as e:
-                print(f"Error loading tsunami zones: {e}")
+        # Placeholder for Tsunami Zones (Pending) -> skipped for now to save space/complexity
+
 
     def check_location(self, lat: float, lon: float):
         """
