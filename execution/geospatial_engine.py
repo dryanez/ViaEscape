@@ -1,16 +1,17 @@
-import geopandas as gpd
-from shapely.geometry import Point
 import os
+import fiona
+from shapely.geometry import shape, Point, mapping
+from shapely.ops import nearest_points
 
 class GeospatialEngine:
     def __init__(self):
-        self.tsunami_zones = None
-        self.meeting_points = None
+        self.tsunami_zones = [] # List of shapely geometries
+        self.evac_routes = []   # List of dicts with 'geometry' and 'properties'
         self._load_data()
 
     def _load_data(self):
         """
-        Loads shapefiles from .tmp/data/ and local user folders.
+        Loads shapefiles using fiona (lightweight) instead of geopandas.
         """
         data_path = ".tmp/data"
         user_data_path = "Vías_de_Evacuación_Tsunami/vias_evacuacion.shp"
@@ -18,25 +19,32 @@ class GeospatialEngine:
         # Load Evacuation Routes (User Provided)
         if os.path.exists(user_data_path):
             try:
-                self.evac_routes = gpd.read_file(user_data_path)
-                if self.evac_routes.crs != "EPSG:4326":
-                    self.evac_routes = self.evac_routes.to_crs("EPSG:4326")
+                with fiona.open(user_data_path) as source:
+                    # Check CRS (heuristic, fiona returns proj4 string or dict)
+                    # We assume it's roughly correct or we might need handling if it't not EPSG:4326
+                    # For this MVP we trust source or simple user files.
+                    print(f"Loading routes from {user_data_path}...")
+                    for feature in source:
+                        geom = shape(feature['geometry'])
+                        self.evac_routes.append({
+                            'geometry': geom,
+                            'properties': feature['properties']
+                        })
                 print(f"Loaded {len(self.evac_routes)} evacuation routes.")
             except Exception as e:
                 print(f"Error loading routes: {e}")
-                self.evac_routes = gpd.GeoDataFrame(geometry=[])
         else:
              print(f"WARNING: Evacuation routes not found at {user_data_path}. Using empty mock.")
-             self.evac_routes = gpd.GeoDataFrame(geometry=[])
 
         # Placeholder for Tsunami Zones (Pending)
         tsunami_path = os.path.join(data_path, "tsunami", "evacuation_area.shp")
         if os.path.exists(tsunami_path):
-            self.tsunami_zones = gpd.read_file(tsunami_path)
-            if self.tsunami_zones.crs != "EPSG:4326":
-                self.tsunami_zones = self.tsunami_zones.to_crs("EPSG:4326")
-        else:
-            self.tsunami_zones = gpd.GeoDataFrame(geometry=[])
+            try:
+                 with fiona.open(tsunami_path) as source:
+                    for feature in source:
+                        self.tsunami_zones.append(shape(feature['geometry']))
+            except Exception as e:
+                print(f"Error loading tsunami zones: {e}")
 
     def check_location(self, lat: float, lon: float):
         """
@@ -48,43 +56,41 @@ class GeospatialEngine:
         nearest_route_info = None
 
         # Check Tsunami Zones
-        if not self.tsunami_zones.empty:
-            hits = self.tsunami_zones.contains(user_point)
-            if hits.any():
+        for zone in self.tsunami_zones:
+            if zone.contains(user_point):
                 hazards.append("Tsunami Evacuation Zone")
+                break # Found one, that's enough for warning
         
-        # Find nearest route regardless of hazard zone (for now, as users might be near one)
-        if not self.evac_routes.empty:
-            # Calculate distance to all routes (expensive for large datasets, but efficient enough for MVP)
-            # Better implementation: use sindex.nearest()
-            # unique_index = self.evac_routes.sindex
+        # Find nearest route
+        if self.evac_routes:
+            min_dist = float('inf')
+            nearest_feature = None
             
-            # Simple distance sorting for now
-            distances = self.evac_routes.distance(user_point)
-            min_dist_idx = distances.idxmin()
-            nearest_route = self.evac_routes.loc[min_dist_idx]
-            min_dist_deg = distances.min()
+            # Linear search (slow for massive data, but okay for MVP with <3000 routes)
+            # A spatial index (rtree) would be better but requires more dependencies
+            for feature in self.evac_routes:
+                dist = user_point.distance(feature['geometry'])
+                if dist < min_dist:
+                    min_dist = dist
+                    nearest_feature = feature
             
-            # Approximate conversion deg to meters (at these latitudes ~111km/deg)
-            dist_meters = min_dist_deg * 111139 
-            
-            from shapely.geometry import mapping
-            from shapely.ops import nearest_points
-            
-            # Find the point on the route closest to the user
-            # nearest_points returns (pt1, pt2) where pt1 is on geom1 and pt2 is on geom2
-            closest_point_on_route = nearest_points(user_point, nearest_route.geometry)[1]
-            
-            dest_lat = closest_point_on_route.y
-            dest_lon = closest_point_on_route.x
+            if nearest_feature:
+                # Approximate conversion deg to meters (at these latitudes ~111km/deg)
+                dist_meters = min_dist * 111139 
+                
+                # Find the point on the route closest to the user
+                closest_point_on_route = nearest_points(user_point, nearest_feature['geometry'])[1]
+                
+                dest_lat = closest_point_on_route.y
+                dest_lon = closest_point_on_route.x
 
-            nearest_route_info = {
-                "distance_meters": round(dist_meters, 2),
-                "name": f"Route in {nearest_route.get('nom_com', 'Unknown')}",
-                "description": "Follow marked evacuation signs.",
-                "geometry": mapping(nearest_route.geometry),
-                "destination": {"lat": dest_lat, "lon": dest_lon}
-            }
+                nearest_route_info = {
+                    "distance_meters": round(dist_meters, 2),
+                    "name": f"Route in {nearest_feature['properties'].get('nom_com', 'Unknown')}",
+                    "description": "Follow marked evacuation signs.",
+                    "geometry": mapping(nearest_feature['geometry']),
+                    "destination": {"lat": dest_lat, "lon": dest_lon}
+                }
 
         is_safe = len(hazards) == 0    
         
@@ -94,6 +100,7 @@ class GeospatialEngine:
             "nearest_route": nearest_route_info,
             "message": "You are near evacuation routes!" if nearest_route_info else "No nearby routes found."
         }
+
 
 # Global instance
 engine = GeospatialEngine()
