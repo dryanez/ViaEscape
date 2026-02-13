@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
-from execution.geospatial_engine import engine
+from .geospatial_engine import engine
 import uvicorn
 
 app = FastAPI()
