@@ -131,3 +131,22 @@ p {
 .google-maps-btn:hover {
     background-color: #357ae8;
 }
+
+.logo-corner {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 60px;
+    height: auto;
+    z-index: 1000;
+}
+
+.logo-corner img {
+    width: 100%;
+    height: auto;
+}
+
+/* Adjust container to handle absolute logo relative to body or container */
+.container {
+    position: relative;
+    /* keep existing styles */
