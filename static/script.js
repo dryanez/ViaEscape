@@ -104,7 +104,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Handle Meeting Point (Green Marker)
         let destination = null;
-        if (data.nearest_meeting_point) {
+        // Only show meeting point if:
+        // 1. User is NOT safe (IN DANGER)
+        // 2. OR User is Safe but meeting point is close (< 2000 meters)
+        // 3. OR User explicitly asks (logic not here yet, but this captures the feedback)
+
+        const isNearby = data.nearest_meeting_point && data.nearest_meeting_point.distance_meters < 2000;
+
+        if (data.nearest_meeting_point && (!data.safe || isNearby)) {
             routeInfo.classList.remove('hidden');
             document.getElementById('route-dist').textContent = data.nearest_meeting_point.distance_meters;
             document.getElementById('route-name').textContent = data.nearest_meeting_point.name;
@@ -129,17 +136,17 @@ document.addEventListener('DOMContentLoaded', () => {
             }).addTo(map).bindPopup("Punto de Encuentro Seguro");
 
             boundsGroup.addLayer(mpLayer);
-        }
 
-        // Handle Route (Line)
-        if (data.nearest_route && data.nearest_route.geometry) {
-            const routeLayer = L.geoJSON(data.nearest_route.geometry, {
-                style: { color: 'blue', weight: 4, dashArray: '10, 10', opacity: 0.6 }
-            }).addTo(map);
-            boundsGroup.addLayer(routeLayer);
-
-            // Fallback destination if no meeting point
-            if (!destination) destination = data.nearest_route.destination;
+            // Handle Route (Line) - Only draw if we are showing the meeting point
+            if (data.nearest_route && data.nearest_route.geometry) {
+                const routeLayer = L.geoJSON(data.nearest_route.geometry, {
+                    style: { color: 'blue', weight: 4, dashArray: '10, 10', opacity: 0.6 }
+                }).addTo(map);
+                boundsGroup.addLayer(routeLayer);
+            }
+        } else if (data.safe) {
+            // If safe and far, don't show route info card, but maybe keep message clear
+            message.textContent = "No te encuentras en una zona de riesgo de Tsunami. No es necesaria la evacuación.";
         }
 
         // Fit Map Bounds
