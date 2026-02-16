@@ -3,3 +3,13 @@ venv/
 __pycache__/
 .DS_Store
 *.pyc
+# Shapefiles
+*.shp
+*.shx
+*.dbf
+*.cpg
+*.prj
+*.sbn
+*.sbx
+*.xml
+cota30_nacional/

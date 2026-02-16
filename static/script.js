@@ -67,15 +67,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         routeInfo.classList.add('hidden');
 
+        // Update Title & Message
         if (data.safe) {
-            title.textContent = "Zona Segura";
+            title.textContent = "Fuera de Zona de Peligro";
             title.className = "status-safe";
-            message.textContent = data.message;
         } else {
-            title.textContent = "¡PELIGRO!";
+            title.textContent = "¡PELIGRO DE TSUNAMI!";
             title.className = "status-danger";
-            message.textContent = data.message;
         }
+        message.textContent = data.message;
 
         // Initialize Map
         if (!map) {
@@ -94,52 +94,71 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        // User Marker
-        L.marker([userLat, userLon]).addTo(map)
-            .bindPopup("Estás aquí")
-            .openPopup();
+        // Feature Group for Bounds
+        const boundsGroup = new L.featureGroup();
 
-        // Show route info if available (even if safe, user might want to know)
-        if (data.nearest_route) {
+        // User Marker (Blue)
+        const userMarker = L.marker([userLat, userLon]).addTo(map)
+            .bindPopup("Tu Ubicación").openPopup();
+        boundsGroup.addLayer(userMarker);
+
+        // Handle Meeting Point (Green Marker)
+        let destination = null;
+        if (data.nearest_meeting_point) {
             routeInfo.classList.remove('hidden');
-            document.getElementById('route-dist').textContent = data.nearest_route.distance_meters;
-            document.getElementById('route-name').textContent = data.nearest_route.name;
+            document.getElementById('route-dist').textContent = data.nearest_meeting_point.distance_meters;
+            document.getElementById('route-name').textContent = data.nearest_meeting_point.name;
 
-            // Draw Route Geometry
-            if (data.nearest_route.geometry) {
-                const routeLayer = L.geoJSON(data.nearest_route.geometry, {
-                    style: { color: 'green', weight: 5 }
-                }).addTo(map);
+            const mp = data.nearest_meeting_point;
+            destination = mp.destination;
 
-                // Fit bounds to show both user and route
-                const group = new L.featureGroup([L.marker([userLat, userLon]), routeLayer]);
-                try {
-                    map.fitBounds(group.getBounds(), { padding: [50, 50] });
-                } catch (e) { console.warn("Could not fit bounds", e); }
-            }
+            // Green Icon for Safety Zone
+            const greenIcon = new L.Icon({
+                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+                iconSize: [25, 41],
+                iconAnchor: [12, 41],
+                popupAnchor: [1, -34],
+                shadowSize: [41, 41]
+            });
 
-            // If strictly safe but close to a route, maybe show warning?
-            if (data.safe && data.nearest_route.distance_meters < 500) {
-                title.textContent = "Precaución";
-                title.className = "status-warning";
-                message.textContent = "Estás cerca de una vía de evacuación.";
-            }
+            const mpLayer = L.geoJSON(mp.geometry, {
+                pointToLayer: function (feature, latlng) {
+                    return L.marker(latlng, { icon: greenIcon });
+                }
+            }).addTo(map).bindPopup("Punto de Encuentro Seguro");
 
-            // Google Maps Button
-            if (data.nearest_route.destination) {
-                const existingBtn = document.getElementById('gmaps-btn');
-                if (existingBtn) existingBtn.remove();
+            boundsGroup.addLayer(mpLayer);
+        }
 
-                const btn = document.createElement('a');
-                btn.id = 'gmaps-btn';
-                btn.className = 'btn google-maps-btn';
-                // URL scheme for navigation
-                btn.href = `https://www.google.com/maps/dir/?api=1&destination=${data.nearest_route.destination.lat},${data.nearest_route.destination.lon}&travelmode=walking`;
-                btn.target = '_blank';
-                btn.textContent = '📍 Ir con Google Maps';
+        // Handle Route (Line)
+        if (data.nearest_route && data.nearest_route.geometry) {
+            const routeLayer = L.geoJSON(data.nearest_route.geometry, {
+                style: { color: 'blue', weight: 4, dashArray: '10, 10', opacity: 0.6 }
+            }).addTo(map);
+            boundsGroup.addLayer(routeLayer);
 
-                routeInfo.appendChild(btn);
-            }
+            // Fallback destination if no meeting point
+            if (!destination) destination = data.nearest_route.destination;
+        }
+
+        // Fit Map Bounds
+        try {
+            map.fitBounds(boundsGroup.getBounds(), { padding: [50, 50] });
+        } catch (e) { console.warn("Could not fit bounds", e); }
+
+        // Google Maps Button
+        const existingBtn = document.getElementById('gmaps-btn');
+        if (existingBtn) existingBtn.remove();
+
+        if (destination) {
+            const btn = document.createElement('a');
+            btn.id = 'gmaps-btn';
+            btn.className = 'btn google-maps-btn';
+            btn.href = `https://www.google.com/maps/dir/?api=1&destination=${destination.lat},${destination.lon}&travelmode=walking`;
+            btn.target = '_blank';
+            btn.textContent = '📍 Ir a Zona Segura (Google Maps)';
+            routeInfo.appendChild(btn);
         }
 
         // Fix map rendering issues when unhidden
